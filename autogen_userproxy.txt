@@ -1,0 +1,32 @@
+user_proxy_agent = UserProxyAgent("UserProxyAgent", description="A proxy for the user to approve or disapprove tasks.")
+
+
+def selector_func_with_user_proxy(messages: Sequence[AgentEvent | ChatMessage]) -> str | None:
+    if messages[-1].source != planning_agent.name and messages[-1].source != user_proxy_agent.name:
+        # Planning agent should be the first to engage when given a new task, or check progress.
+        return planning_agent.name
+    if messages[-1].source == planning_agent.name:
+        if messages[-2].source == user_proxy_agent.name and "APPROVE" in messages[-1].content.upper():  # type: ignore
+            # User has approved the plan, proceed to the next agent.
+            return None
+        # Use the user proxy agent to get the user's approval to proceed.
+        return user_proxy_agent.name
+    if messages[-1].source == user_proxy_agent.name:
+        # If the user does not approve, return to the planning agent.
+        if "APPROVE" not in messages[-1].content.upper():  # type: ignore
+            return planning_agent.name
+    return None
+
+
+# Reset the previous agents and run the chat again with the user proxy agent and selector function.
+await team.reset()
+team = SelectorGroupChat(
+    [planning_agent, web_search_agent, data_analyst_agent, user_proxy_agent],
+    model_client=model_client,
+    termination_condition=termination,
+    selector_prompt=selector_prompt,
+    selector_func=selector_func_with_user_proxy,
+    allow_repeated_speaker=True,
+)
+
+await Console(team.run_stream(task=task))
