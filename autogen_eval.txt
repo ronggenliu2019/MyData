@@ -1,0 +1,37 @@
+from autogen import AssistantAgent, UserProxyAgent, config_list_from_json
+from autogen.agentchat.contrib.agent_eval import AgentEval
+
+# Setup your agents
+config_list = config_list_from_json("OAI_CONFIG_LIST")
+llm_config = {"config_list": config_list}
+
+assistant = AssistantAgent("assistant", llm_config=llm_config)
+user_proxy = UserProxyAgent("user_proxy", code_execution_config={"work_dir": "coding"})
+
+# Define evaluation tasks 
+eval_tasks = [
+    {"task_id": "math_problem_1", "task": "What is the sum of all integers from 1 to 100?"},
+    {"task_id": "coding_problem_1", "task": "Write a Python function to find the factorial of a number."},
+    # Add more tasks as needed
+]
+
+# Create evaluation criteria
+eval_criteria = [
+    {"name": "correctness", "description": "Is the answer correct?"},
+    {"name": "efficiency", "description": "Is the solution efficient?"},
+    {"name": "clarity", "description": "Is the explanation clear and understandable?"}
+]
+
+# Initialize AgentEval
+evaluator = AgentEval(
+    agent_tuples=[(user_proxy, assistant)],  # Tuples of (user_agent, assistant_agent)
+    tasks=eval_tasks,
+    criteria=eval_criteria,
+    llm_config=llm_config  # For the judge agent
+)
+
+# Run evaluation
+results = evaluator.run()
+
+# Analyze results
+evaluator.print_summary()
